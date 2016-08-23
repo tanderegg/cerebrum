@@ -1,6 +1,7 @@
 ### NeuralNetwork class, adapted from
 ### http://neuralnetworksanddeeplearning.com/chap1.html
 import random
+import time
 
 import numpy
 
@@ -12,7 +13,7 @@ def random_init(layers):
     with a Gaussian distribution and stddev of 1.  Note that 'biases' is one
     dimension less than layer_sizes, as the input layer doesn't use biases.
     """
-    biases = [numpy.random.randn(y) for y in layers[1:]]
+    biases = [numpy.random.randn(y, 1) for y in layers[1:]]
     weights = [numpy.random.randn(y, x)
         for x, y in zip(layers[:-1], layers[1:])]
     return biases, weights
@@ -53,15 +54,15 @@ class NeuralNetwork(object):
         )
 
 
-    def feedforward(self, inputs, f=sigmoid):
+    def feedforward(self, activations, f=sigmoid):
         """
         Return the output of the neural net on 'inputs'.  The weights are
         combined with the inputs via dot product, and the biases added to the
         result, which is passed to f (the sigmoid function by default).
         """
         for biases, weights in zip(self.biases, self.weights):
-            inputs = f(numpy.dot(weights, inputs) + biases)
-        return inputs
+            activations = f(numpy.dot(weights, activations) + biases)
+        return activations
 
 
     def SGD(self, training_data, epochs, mini_batch_size, learning_rate,
@@ -77,23 +78,29 @@ class NeuralNetwork(object):
         training_data_length = len(training_data)
 
         for j in list(range(epochs)):
+            start_time = time.time()
             random.shuffle(training_data)
 
             # Generate minibatches after randomizing the training data
             mini_batches = [
                 training_data[k:k+mini_batch_size]
-                    for k in list(range(0, training_data_length, mini_batch_size))
+                    for k in list(
+                        range(0, training_data_length, mini_batch_size)
+                    )
             ]
 
             for mini_batch in mini_batches:
                 self.update_mini_batch(mini_batch, learning_rate)
 
             if test_data:
+                result = self.evaluate(test_data)
                 print("Epoch {0}: {1} / {2}".format(
-                    j, self.evaluate(test_data), test_data_length
+                    j, result, test_data_length
                 ))
             else:
                 print("Epoch {0} complete.".format(j))
+            elapsed_time = time.time() - start_time
+            print("Time elapsed: {0}".format(elapsed_time))
 
 
     def update_mini_batch(self, mini_batch, learning_rate):
@@ -118,12 +125,12 @@ class NeuralNetwork(object):
             ]
 
         self.weights = [
-            w-(learning_rate/len(mini_batch))*nw for w, nw in zip(
+            w-(learning_rate/len(mini_batch))*gw for w, gw in zip(
                 self.weights, gradients_w
             )
         ]
         self.biases = [
-            b-(learning_rate/len(mini_batch))*nb for b, nb in zip(
+            b-(learning_rate/len(mini_batch))*gb for b, gb in zip(
                 self.biases, gradients_b
             )
         ]
@@ -158,7 +165,7 @@ class NeuralNetwork(object):
         delta = self.cost_derivative(activations[-1], y_out) * \
             sigmoid_prime(weighted_inputs[-1])
         gradients_b[-1] = delta
-        gradients_w[-1] = numpy.dot(delta, activations[-1].transpose())
+        gradients_w[-1] = numpy.dot(delta, activations[-2].transpose())
 
         # Continue propagate backwards to do the rest
         for layer in list(range(2, self.num_layers)):
@@ -167,18 +174,18 @@ class NeuralNetwork(object):
             delta = numpy.dot(self.weights[-layer+1].transpose(), delta) * sp
             gradients_b[-layer] = delta
             gradients_w[-layer] = numpy.dot(
-                delta, activations[-layer].transpose()
+                delta, activations[-layer-1].transpose()
             )
 
         return gradients_b, gradients_w
 
 
-    def cost_derivative(self, activation, y_out):
+    def cost_derivative(self, activations, y_out):
         """
         The cost derivative, in this case a simple difference between the
         desired outputs and the result of this round of activations.
         """
-        return (activation-y_out)
+        return (activations-y_out)
 
 
     def evaluate(self, inputs):
@@ -186,6 +193,6 @@ class NeuralNetwork(object):
         Takes a series of inputs, and returns the indexes of the output chosen
         as the correct one for each.
         """
-        test_results = [numpy.argmax(self.feedforward(x_in))
+        test_results = [(numpy.argmax(self.feedforward(x_in)), y_out)
             for (x_in, y_out) in inputs]
-        return test_results
+        return sum(int(x==y) for (x, y) in test_results)

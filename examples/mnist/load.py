@@ -19,6 +19,12 @@ def extract():
 
 
 def transform():
+    """
+    We need to shape all the data to match our neural network, the inputs
+    in this case are a matrix of n 784x1 numpy vectors, and n 10x1 output
+    vectors, corresponding to the input layer and output layer of the
+    neural network.
+    """
     training_data, validation_data, test_data = extract()
 
     # Training inputs come from the first item in the tuple, and we reshape
@@ -32,7 +38,7 @@ def transform():
 
     test_inputs = [numpy.reshape(x, (784, 1)) for x in test_data[0]]
     test_data = zip(test_inputs, test_data[1])
-    return (training_data, validation_data, test_data)
+    return (list(training_data), list(validation_data), list(test_data))
 
 def vectorized_result(j):
     """
